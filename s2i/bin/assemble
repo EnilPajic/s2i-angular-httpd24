@@ -1,14 +1,6 @@
 #!/bin/bash -e
 #
-# S2I assemble script for the 's2i-angular-httpd24' image.
-# The 'assemble' script builds your application source so that it is ready to run.
-#
-# For more information refer to the documentation:
-#	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
-#
-
-# If the 's2i-angular-httpd24' assemble script is executed with the '-h' flag,
-# print the usage.
+# Heavily based (only slight modifications) on: https://github.com/mprahl/s2i-angular-httpd24
 if [[ "$1" == "-h" ]]; then
 	exec /usr/libexec/s2i/usage
 fi
@@ -17,15 +9,19 @@ echo "---> Running the httpd-24 assemble script..."
 /usr/libexec/s2i/assemble-httpd
 echo "---> Done running the httpd-24 assemble script"
 
-if [ "$(ls /tmp/ng-environments/ 2>/dev/null)" ]; then
-  echo "---> Copying custom Angular environment files"
-  cp -pf /tmp/ng-environments/* ./src/environments/
-fi
+
 
 # Change the npm registry mirror if provided. This variable matches the
 # one used in s2i-nodejs.
 if [ -n "$NPM_MIRROR" ]; then
   scl enable rh-nodejs10 'npm config set registry $NPM_MIRROR'
+fi
+
+if [ -n "$GULP_MODE" ]; then
+  GULP_MODE=build
+fi
+if [ -n "$GULP_FILE" ]; then
+  GULP_FILE="./gulpfile.js"
 fi
 
 # The base image already copied the source files the home directory,
@@ -34,8 +30,8 @@ echo "---> Installing the NPM dependencies (including dev)"
 scl enable rh-nodejs10 'npm install'
 scl enable rh-nodejs10 'npm install --only=dev'
 
-echo "---> Building and installing the Angular application with the '$NG_CONFIG' configuration"
-scl enable rh-nodejs10 "./node_modules/@angular/cli/bin/ng build --configuration=$NG_CONFIG --output-path dist"
+echo "---> Building and installing the Gulp application with the '$GULP_MODE' mode and '$GULP_FILE' file"
+scl enable rh-nodejs10 "node ./node_modules/gulp/bin/gulp.js $GULP_MODE -f $GULP_FILE"
 # Delete all source files since they are no longer needed
 find -maxdepth 1 -not -name "dist" -not -name "." -exec rm -rf {} \;
 # Move the build files to the source root
